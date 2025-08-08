@@ -389,6 +389,21 @@ const generateHttpClinetFiles = async (
     ',\n',
   )} } from '${relativeSchemasPath}';`;
 
+  // Import mutators used by http-client (custom fetch wrapper, form utilities, params serializer, revivers)
+  const mutators = Object.values(verbOptions)
+    .flatMap((v) => [
+      v.mutator,
+      v.formData,
+      v.formUrlEncoded,
+      v.paramsSerializer,
+      v.fetchReviver,
+    ])
+    .filter((m): m is GeneratorMutator => Boolean(m));
+  const mutatorsImports = generateMutatorImports({
+    mutators,
+    implementation: clientImplementation,
+  });
+
   const fetchHeader = generateFetchHeader({
     title: '',
     isRequestOptions: false,
@@ -405,6 +420,7 @@ const generateHttpClinetFiles = async (
   const content = [
     header,
     importImplementation,
+    mutatorsImports,
     fetchHeader,
     clientImplementation,
   ].join('\n');

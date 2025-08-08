@@ -20,7 +20,9 @@
     "generate:fetch": "yarn orval --config ./configs/fetch.config.ts",
     "generate:mcp": "yarn orval --config ./configs/mcp.config.ts",
     "generate:hono": "yarn orval --config ./configs/hono.config.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "assert:mcp-mutator-import": "node ./assertions/assert-mcp-import.js",
+    "verify:mcp": "yarn generate:mcp && yarn build && yarn assert:mcp-mutator-import"
   },
   "author": "Victor Bury",
   "license": "ISC",
