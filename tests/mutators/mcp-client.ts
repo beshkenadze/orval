@@ -19,4 +19,3 @@ export async function mcpInstance<T = unknown>(
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
-
