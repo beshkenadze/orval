@@ -48,3 +48,6 @@ jobs:
       - name: test MCP server
         working-directory: ./tests
         run: yarn test:mcp-inspector
+      - name: test MCP server with auth
+        working-directory: ./tests
+        run: yarn test:mcp-auth

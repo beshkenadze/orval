@@ -5,6 +5,7 @@ import fs from 'fs';
 
 describe('MCP Generated Server Inspector Test', () => {
   const generatedServerDir = path.join(__dirname, './generated/mcp/single');
+  const generatedServerWithMutatorDir = path.join(__dirname, './generated/mcp/single-mutator');
 
   beforeAll(() => {
     // Verify the compiled server exists
