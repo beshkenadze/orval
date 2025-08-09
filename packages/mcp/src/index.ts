@@ -93,25 +93,9 @@ export const getMcpHeader: ClientHeaderBuilder = ({
   )}\n} from '${relativeFetchClientPath}';
   `;
 
-  // Collect mutators from verb options
-  const allMutators = Object.values(verbOptions).reduce(
-    (acc, verbOption) => {
-      if (verbOption.mutator) {
-        acc[verbOption.mutator.name] = verbOption.mutator;
-      }
-      return acc;
-    },
-    {} as Record<string, GeneratorMutator>,
-  );
-
-  const mutatorsImports = generateMutatorImports({
-    mutators: Object.values(allMutators),
-  });
-
   const content = [
     importSchemasImplementation,
     importFetchClientImplementation,
-    mutatorsImports,
   ].join('\n');
 
   return content + '\n';
