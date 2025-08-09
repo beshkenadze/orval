@@ -5,14 +5,17 @@ import fs from 'fs';
 
 describe('MCP Generated Server Inspector Test', () => {
   const generatedServerDir = path.join(__dirname, './generated/mcp/single');
-  const generatedServerWithMutatorDir = path.join(__dirname, './generated/mcp/single-mutator');
+  const generatedServerWithMutatorDir = path.join(
+    __dirname,
+    './generated/mcp/single-mutator',
+  );
 
   beforeAll(() => {
     // Verify the compiled server exists
     const serverPath = path.join(generatedServerDir, 'dist/server.js');
     if (!fs.existsSync(serverPath)) {
       throw new Error(
-        'Compiled MCP server not found. Run: yarn build:mcp-server first'
+        'Compiled MCP server not found. Run: yarn build:mcp-server first',
       );
     }
   });
@@ -25,7 +28,7 @@ describe('MCP Generated Server Inspector Test', () => {
       {
         stdio: 'pipe',
         env: { ...process.env, NODE_ENV: 'test' },
-      }
+      },
     );
 
     let errorOutput = '';
@@ -35,7 +38,7 @@ describe('MCP Generated Server Inspector Test', () => {
     serverProcess.stderr?.on('data', (data) => {
       const output = data.toString();
       errorOutput += output;
-      
+
       // Check for successful server start
       if (output.includes('MCP server running on stdio')) {
         serverStarted = true;
@@ -72,10 +75,10 @@ describe('MCP Generated Server Inspector Test', () => {
     // Validate the generated files contain expected tools
     const serverPath = path.join(generatedServerDir, 'server.ts');
     const handlersPath = path.join(generatedServerDir, 'handlers.ts');
-    
+
     const serverContent = fs.readFileSync(serverPath, 'utf-8');
     const handlersContent = fs.readFileSync(handlersPath, 'utf-8');
-    
+
     // Expected tools from petstore.yaml
     const expectedTools = [
       { tool: 'listPets', handler: 'listPetsHandler' },
@@ -89,13 +92,15 @@ describe('MCP Generated Server Inspector Test', () => {
       // Check tool registration in server.ts
       expect(serverContent).toContain(`server.tool(\n  '${tool}'`);
       expect(serverContent).toContain(handler);
-      
+
       // Check handler export in handlers.ts
       expect(handlersContent).toContain(`export const ${handler}`);
     }
 
     // Check for MCP SDK imports
-    expect(serverContent).toContain("@modelcontextprotocol/sdk/server/mcp.js");
-    expect(serverContent).toContain("@modelcontextprotocol/sdk/server/stdio.js");
+    expect(serverContent).toContain('@modelcontextprotocol/sdk/server/mcp.js');
+    expect(serverContent).toContain(
+      '@modelcontextprotocol/sdk/server/stdio.js',
+    );
   });
 });

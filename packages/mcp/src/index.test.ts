@@ -1,11 +1,15 @@
-import type { GeneratorOptions, GeneratorVerbOptions, NormalizedOutputOptions } from '@orval/core';
+import type {
+  GeneratorOptions,
+  GeneratorVerbOptions,
+  NormalizedOutputOptions,
+} from '@orval/core';
 import { describe, expect, it } from 'vitest';
 import { builder, getMcpHeader } from './index';
 
 describe('MCP Generator', () => {
   it('should export builder function', () => {
     const mcpBuilder = builder()();
-    
+
     expect(mcpBuilder).toBeDefined();
     expect(mcpBuilder.client).toBeDefined();
     expect(mcpBuilder.header).toBeDefined();
@@ -14,21 +18,25 @@ describe('MCP Generator', () => {
 
   it('should generate handler with correct name', async () => {
     const { generateMcp } = await import('./index');
-    
+
     const verbOptions = {
       operationName: 'testOperation',
       params: [],
       body: { definition: null },
     } as unknown as GeneratorVerbOptions;
 
-    const result = await generateMcp(verbOptions, {} as GeneratorOptions, 'fetch', {} as NormalizedOutputOptions);
-    
+    const result = await generateMcp(
+      verbOptions,
+      {} as GeneratorOptions,
+      'fetch',
+      {} as NormalizedOutputOptions,
+    );
+
     expect(result.implementation).toContain('testOperationHandler');
     expect(result.implementation).toContain('await testOperation()');
   });
 
   it('should handle mutator in getMcpHeader correctly', () => {
-    
     // Test that getMcpHeader does NOT include mutator imports
     const verbOptions = {
       testOp: {
@@ -58,7 +66,7 @@ describe('MCP Generator', () => {
       output,
       clientImplementation: '',
     });
-    
+
     // Should NOT contain mutator import in handlers
     expect(result).not.toContain('customMutator');
     expect(result).toContain("import {\n  testOp\n} from './http-client'");
