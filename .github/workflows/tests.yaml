@@ -45,3 +45,6 @@ jobs:
       - name: tests build
         working-directory: ./tests
         run: yarn build
+      - name: test MCP server
+        working-directory: ./tests
+        run: yarn test:mcp-inspector
