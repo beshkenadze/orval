@@ -19,6 +19,7 @@
     "generate:mock": "yarn orval --config ./configs/mock.config.ts",
     "generate:fetch": "yarn orval --config ./configs/fetch.config.ts",
     "generate:mcp": "yarn orval --config ./configs/mcp.config.ts",
+    "generate:mcp-mutator": "yarn orval --config ./configs/mcp-mutator.config.ts",
     "generate:hono": "yarn orval --config ./configs/hono.config.ts",
     "build": "tsc"
   },
