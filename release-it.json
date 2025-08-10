@@ -1,0 +1,37 @@
+{
+  "$schema": "https://unpkg.com/release-it@19/schema/release-it.json",
+  "git": {
+    "commitMessage": "chore: release v${version}",
+    "tagName": "v${version}",
+    "tagAnnotation": "Release v${version}",
+    "requireCleanWorkingDir": false,
+    "requireBranch": "main",
+    "push": true,
+    "pushArgs": ["--follow-tags"]
+  },
+  "github": {
+    "release": true,
+    "releaseName": "v${version}",
+    "releaseNotes": "git log --pretty=format:'* %s (%h)' ${latestTag}...HEAD",
+    "draft": false,
+    "preRelease": false,
+    "assets": ["packages/*/dist/**/*.js", "packages/*/dist/**/*.d.ts"]
+  },
+  "npm": {
+    "publish": false,
+    "skipChecks": true
+  },
+  "hooks": {
+    "before:init": ["yarn test", "yarn lint"],
+    "after:bump": "yarn build",
+    "after:git:release": "echo 'Git tag pushed successfully'",
+    "after:github:release": "echo 'GitHub release created successfully'",
+    "after:release": "echo 'Successfully released ${name} v${version}'"
+  },
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "preset": "angular",
+      "infile": "CHANGELOG.md"
+    }
+  }
+}

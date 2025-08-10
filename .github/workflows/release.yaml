@@ -1,0 +1,230 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (patch, minor, major, or specific version)'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prepatch
+          - preminor
+          - premajor
+      preRelease:
+        description: 'Pre-release identifier (e.g., beta, alpha)'
+        required: false
+        default: ''
+      dryRun:
+        description: 'Perform a dry run'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@beshkenadze'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build all packages
+        run: yarn build
+
+      - name: Run tests
+        run: yarn test
+
+      - name: Configure GitHub Packages registry
+        run: |
+          echo "@beshkenadze:registry=https://npm.pkg.github.com" >> ~/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare Release
+        id: prepare
+        run: |
+          # Construct release-it arguments
+          ARGS=""
+          
+          # Version increment
+          if [[ -n "${{ github.event.inputs.version }}" ]]; then
+            ARGS="${{ github.event.inputs.version }}"
+          fi
+          
+          # Pre-release
+          if [[ -n "${{ github.event.inputs.preRelease }}" ]]; then
+            ARGS="$ARGS --preRelease=${{ github.event.inputs.preRelease }}"
+          fi
+          
+          # Dry run
+          if [[ "${{ github.event.inputs.dryRun }}" == "true" ]]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          
+          # CI mode (non-interactive)
+          ARGS="$ARGS --ci"
+          
+          echo "RELEASE_ARGS=$ARGS" >> $GITHUB_OUTPUT
+          echo "Release arguments: $ARGS"
+
+      - name: Release with release-it
+        run: npx release-it ${{ steps.prepare.outputs.RELEASE_ARGS }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update package names for GitHub registry (if not dry run)
+        if: github.event.inputs.dryRun != 'true'
+        run: |
+          # Get the new version from package.json
+          VERSION=$(node -p "require('./package.json').version")
+          
+          # Create a branch for GitHub Packages release
+          git checkout -b github-packages-release-$VERSION
+          
+          # Update root package name
+          jq '.name = "@beshkenadze/orval-monorepo"' package.json > tmp.json && mv tmp.json package.json
+          
+          # Update individual packages to use @beshkenadze scope
+          for pkg in packages/*; do
+            if [ -f "$pkg/package.json" ]; then
+              pkg_name=$(basename $pkg)
+              
+              # Special handling for main orval package
+              if [ "$pkg_name" = "orval" ]; then
+                jq '.name = "@beshkenadze/orval"' "$pkg/package.json" > tmp.json
+              else
+                jq --arg name "@beshkenadze/orval-$pkg_name" '.name = $name' "$pkg/package.json" > tmp.json
+              fi
+              mv tmp.json "$pkg/package.json"
+              
+              # Update dependencies to use the new scoped names
+              jq '
+                if .dependencies then
+                  .dependencies |= with_entries(
+                    if .key | startswith("@orval/") then
+                      .key = "@beshkenadze/orval-" + (.key | split("/")[1])
+                    elif .key == "orval" then
+                      .key = "@beshkenadze/orval"
+                    else . end
+                  )
+                else . end |
+                if .peerDependencies then
+                  .peerDependencies |= with_entries(
+                    if .key | startswith("@orval/") then
+                      .key = "@beshkenadze/orval-" + (.key | split("/")[1])
+                    elif .key == "orval" then
+                      .key = "@beshkenadze/orval"
+                    else . end
+                  )
+                else . end
+              ' "$pkg/package.json" > tmp.json && mv tmp.json "$pkg/package.json"
+            fi
+          done
+
+      - name: Publish to GitHub Packages (if not dry run)
+        if: github.event.inputs.dryRun != 'true'
+        run: |
+          # Publish packages in dependency order
+          packages=(
+            "packages/core"
+            "packages/zod"
+            "packages/mock"
+            "packages/fetch"
+            "packages/axios"
+            "packages/angular"
+            "packages/swr"
+            "packages/query"
+            "packages/hono"
+            "packages/mcp"
+            "packages/orval"
+          )
+          
+          for pkg in "${packages[@]}"; do
+            echo "Publishing $pkg to GitHub Packages..."
+            cd "$pkg"
+            npm publish --access public --registry https://npm.pkg.github.com || echo "Warning: Failed to publish $pkg"
+            cd ../..
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create summary
+        if: github.event.inputs.dryRun != 'true'
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          
+          echo "## 🎉 Release v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ -n "${{ github.event.inputs.preRelease }}" ]]; then
+            echo "**Pre-release:** ${{ github.event.inputs.preRelease }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Published Packages to GitHub Registry" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Package | Version |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|---------|" >> $GITHUB_STEP_SUMMARY
+          
+          for pkg in packages/*; do
+            if [ -f "$pkg/package.json" ]; then
+              pkg_name=$(jq -r '.name' "$pkg/package.json")
+              echo "| \`$pkg_name\` | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Installation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Add to your \`.npmrc\`:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "@beshkenadze:registry=https://npm.pkg.github.com" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Install with:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "npm install @beshkenadze/orval@$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "# or" >> $GITHUB_STEP_SUMMARY
+          echo "yarn add @beshkenadze/orval@$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "# or" >> $GITHUB_STEP_SUMMARY
+          echo "bun add @beshkenadze/orval@$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Dry run summary
+        if: github.event.inputs.dryRun == 'true'
+        run: |
+          echo "## 🧪 Dry Run Completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This was a dry run. No packages were published." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To perform an actual release, run this workflow again with 'Perform a dry run' unchecked." >> $GITHUB_STEP_SUMMARY
