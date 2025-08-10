@@ -1,5 +1,8 @@
 {
-  "npm": false,
+  "npm": {
+    "publish": false,
+    "skipChecks": true
+  },
   "git": {
     "commitMessage": "chore(release): ${version}"
   },
@@ -12,7 +15,9 @@
       "preset": "angular"
     },
     "@release-it-plugins/workspaces": {
-      "publish": false
+      "publish": false,
+      "workspaces": ["packages/*"],
+      "skipChecks": true
     }
   }
 }
